@@ -1,0 +1,52 @@
+# TCL 43P7K, Europe (device G10, product G10_4K_GB, "Smart TV Pro", Realtek rtd6748), 2 GB RAM, 16 GB
+# Google TV 12, firmware STT2.230203.001, software V8-R75PT01-LF1V500 (client type TCL-EU-RTD75P-S1)
+# Same G10 platform as examples/tcl-g10-google-tv (LF1V499); that list was the starting point.
+# Applied and verified on a real unit on 2026-10-20, with launcher/ as Home. Notes: README.md in this folder.
+#
+# Apply:   TV_HOST=<tv ip> tools/disable.sh examples/tcl-43p7k/debloat.txt
+# Undo:    TV_HOST=<tv ip> tools/restore.sh examples/tcl-43p7k/debloat.txt com.google.android.apps.tv.launcherx
+# Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
+#
+# Stock launcher: com.google.android.apps.tv.launcherx (pass it to restore.sh). launcher/build-and-install.sh
+# disables it once the new launcher has started; it is not in this list.
+# Keep: com.tcl.tv (Live TV, also plays HDMI), com.tcl.tvinput, com.tcl.suspension (the Input button's source
+# panel), com.tcl.autopair, com.tcl.systemserver, com.tcl.initsetup (channel installation),
+# com.tcl.inputmethod.international (the keyboard), com.google.android.tv.remote.service (it carries the
+# remote's mic button), com.google.android.katniss (voice search).
+
+# TCL content, ads and promos
+com.tcl.tv.tclhome_passive             # pushes TCL content to the home screen at boot
+com.tcl.waterfall.overseas             # TCL movie/actor content browser
+com.tcl.channelplus                    # TCL Live FAST channels
+com.tcl.partnercustomizer              # TCL tweaks to Google TV home rows
+com.tcl.interactive                    # TCL TIAS background service
+
+# TCL analytics and updater (one package)
+com.tcl.ttvs                           # BI analytics, Samba hooks, Alexa bridge, T-Cast, TCL app/firmware updater; keep it for TCL updates
+
+# Retail demo / store mode
+com.tcl.exhibit
+com.tcl.esticker
+
+# Preloaded apps and services
+com.tcl.ocean.instructions             # e-manual
+com.tcl.repairguide
+com.tcl.ui_mediaCenter                 # re-enable to play media from USB drives
+com.tcl.UpdatePeripheral               # TCL soundbar firmware updater
+android.autoinstalls.config.google.gtvpai
+com.google.android.feedback
+com.google.android.marvin.talkback
+com.google.android.videos              # Google TV / Play Movies
+com.google.android.play.games
+com.google.android.apps.tv.dreamx      # ambient mode; set screensaver_components first, see README.md
+
+# Google TV setup wizard: claims Home once launcherx is disabled. Here the saved Wi-Fi belonged to
+# android.uid.system, so disabling it kept the network; disable.sh checks this before it acts.
+com.google.android.tungsten.setupwraith
+
+# Optional: kept on this unit by choice
+# com.tcl.gamebar                      # console game-mode overlay
+# com.tcl.airplay2                     # AirPlay, together with the next line
+# com.realtek.airplay2
+# com.tcl.miracast                     # screen mirroring
+# com.google.android.apps.mediashell   # Chromecast

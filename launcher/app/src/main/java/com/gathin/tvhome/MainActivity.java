@@ -128,6 +128,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean heroShown;
     private boolean animations;
     private boolean advancedEffects;
+    /** Launcher settings were opened from here; onResume checks whether a choice made there changed. */
+    private boolean launcherSettingsOpened;
     private TextView greeting;
     private View btnInputs;
     private TextView btnWifi;
@@ -193,6 +195,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean reordering;
     /** Key of the tile being carried in reorder mode, or null. */
     private String movingKey;
+    /** OK is still held from the long press that started reorder mode: its release must not drop the tile. */
+    private boolean okHeldFromLongPress;
     /** Tile order when reorder mode started, to save only when something moved. */
     private List<String> orderAtStart;
     private View btnReorder;
@@ -545,8 +549,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean openLauncherSettingsIfAsked(Intent intent) {
         if (intent == null || !ACTION_LAUNCHER_SETTINGS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
-        startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+        openLauncherSettings();
         return true;
+    }
+
+    private void openLauncherSettings() {
+        launcherSettingsOpened = true;
+        startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
     }
 
     /**
@@ -572,6 +581,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             registerReceiver(packageReceiver, packageFilter);
+        }
+    }
+
+    /**
+     * Back from Launcher settings. Leaving them with the Home button delivers no result (singleTask Home clears
+     * them from the task), so onActivityResult never sees the change; compare the choices here too. Not in
+     * onResume: opened from onNewIntent, the settings start while Home is still resuming.
+     */
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        if (!launcherSettingsOpened) return;
+        launcherSettingsOpened = false;
+        Config now = Config.load(this);
+        if (now.columns != COLUMNS || now.animations != animations
+                || (now.animations && now.advancedEffects) != advancedEffects) {
+            recreate();
         }
     }
 
@@ -610,7 +636,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == LAUNCHER_SETTINGS_REQUEST && resultCode == RESULT_OK) recreate();
+        if (requestCode == LAUNCHER_SETTINGS_REQUEST && resultCode == RESULT_OK) {
+            launcherSettingsOpened = false;   // recreate() below already applies the choices
+            recreate();
+        }
     }
 
     /** Rebuilds the tiles (and the module cards), then puts focus back where it was. */
@@ -777,6 +806,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         boolean ok = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
                 || code == KeyEvent.KEYCODE_NUMPAD_ENTER;
         boolean back = code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE;
+        if (okHeldFromLongPress && ok) {
+            if (!down) okHeldFromLongPress = false;
+            return true;   // the OK that was held to start the mode: the tile stays picked up
+        }
         if (movingKey != null) {
             switch (code) {
                 case KeyEvent.KEYCODE_DPAD_LEFT:
@@ -822,6 +855,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (!beginReorder()) return;
         focusTile(Math.max(0, Math.min(lastFocused, adapter.movableCount() - 1)));
+        Toast.makeText(this, R.string.reorder_hint, Toast.LENGTH_LONG).show();
+    }
+
+    /** OK held on a tile: reorder mode starts with that tile already picked up, so the arrows move it at once. */
+    @Override
+    public void onTileLongPressed(int position) {
+        if (reordering || position >= adapter.movableCount()) return;   // the "Default home" tile stays put
+        String key = adapter.keyAt(position);
+        if (!beginReorder()) return;
+        int pos = adapter.positionOf(key);   // beginReorder can reload the tiles when the dock had empty slots
+        if (pos < 0) return;
+        if (pos != position) focusTile(pos);
+        okHeldFromLongPress = true;
+        pickUp(pos);
         Toast.makeText(this, R.string.reorder_hint, Toast.LENGTH_LONG).show();
     }
 
@@ -936,6 +983,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Ends the mode and saves the order if it changed since the mode started. */
     private void endReorder() {
         if (!reordering) return;
+        okHeldFromLongPress = false;
         dockEditing = false;
         dockEditSlot = -1;
         drop();
@@ -2265,8 +2313,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
         PopupWindow popup = glassPopup(panel, (int) (200 * density));
-        addSettingsMenuRow(rows, popup, R.string.launcher_settings, () -> startActivityForResult(
-                new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
+        addSettingsMenuRow(rows, popup, R.string.launcher_settings, this::openLauncherSettings);
         if (moduleCards) addSettingsMenuRow(rows, popup, R.string.module_cards, this::showModuleCards);
         if (dockRow) addSettingsMenuRow(rows, popup, R.string.dock_edit, this::startDockEdit);
         addSettingsMenuRow(rows, popup, R.string.reorder, this::toggleReorder);
