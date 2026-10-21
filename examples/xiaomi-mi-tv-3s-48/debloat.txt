@@ -1,0 +1,75 @@
+# Xiaomi Mi TV 3S 48" (MiTV3S-48, hancock) — China-market PatchWall set, MStar SoC, ~0.7 GB RAM
+# Android 4.4.4 (API 19), firmware 7.7.21.1653, locale zh-CN. NOT Android TV: no Google services,
+# no TvInputManager, and launcher intents have to fall back to CATEGORY_LAUNCHER. This repo's launcher
+# (minSdk 26) does not install here, so this list is the debloat half; docs/devices/xiaomi-mitv3s-48-hancock.md records
+# what the platform needs from a launcher and where the vendor APIs are.
+#
+# !! `pm disable-user` is booby-trapped on this firmware. system_server SIGKILLs its caller from
+# inside PackageManager.setApplicationEnabledSetting, so `pm disable-user`, `pm enable` and even the
+# Settings UI's 停用 button are dead ends (the button is greyed out for every Xiaomi/duokan/mitv
+# package but works for AOSP ones). OOM protection does not help — the kill comes from that patch,
+# not from the low-memory killer. `pm clear` works, and `pm block` / `pm unblock` work: a blocked
+# package keeps its APK and data but cannot start any component. That is what this list uses.
+#   Apply:  for p in $(grep -v '^#' examples/xiaomi-mi-tv-3s-48/debloat.txt | grep .); do adb shell pm block $p; done
+#   Undo:   for p in $(grep -v '^#' examples/xiaomi-mi-tv-3s-48/debloat.txt | grep .); do adb shell pm unblock $p; done
+# tools/disable.sh and tools/restore.sh cannot read a 4.4 shell (no head/tail/grep) and call
+# `pm disable-user` anyway, so apply the loop above; force-stop each package afterwards.
+#
+# Stock launcher: com.mitv.tvhome (PatchWall) — kept. Freezing it (`pm block com.mitv.tvhome`) is how
+#   Home moves to a third-party launcher here, and it takes the stock 信号源 entry with it: PatchWall's
+#   uid-1000 process hosts the vendor source UI, so plan an input menu inside the launcher. Both ways
+#   of the switch are reversible with pm block/unblock — there is no intermediate state.
+# Live TV / tuner: com.starcor.mango (芒果TV) and com.mstar.tv.service — keep both.
+# Casting: com.xiaomi.mitv.smartshare is the TV-side 小米投屏 / "Wireless Share" receiver (Miracast,
+#   DLNA 影音投屏, iPhone/Mac). It sat in an early version of this list and casting discovery became
+#   unreliable, so it is out, and so are the other receivers (see the last note).
+#
+# Notes:
+# - RAM is 774 MB with MemFree idling around 30 MB (Cached ≈ 200 MB, swap ≈ 110 MB in use).
+#   `pm disable-user` dies even after `am force-stop com.mitv.tvhome`, which is how the patch above
+#   was found.
+# - Only one input method is enabled out of the box (Sogou). Before blocking it, enable the
+#   preloaded Baidu keyboard:  ime enable com.baidu.input/.ImeService && ime set com.baidu.input/.ImeService
+# - The GITV content wall keeps showing promo tiles after this: those come from the server-side feed,
+#   not from these local packages.
+# - `pm install` pops a 安装确认 dialog on the TV; adb sees a >120 s stall until someone presses 确定
+#   (D-pad centre does not always activate it; `input tap` does).
+# - Network ADB (5555) survives reboots; turn it off in Settings → 账号与安全 → ADB调试 when done.
+# - Left alone on purpose: com.mstar.* (HDMI/tuner), com.xiaomi.mitv.remotecontroller.service, both
+#   system UIs, the AOSP keyboards (spare), casting (smartshare/miplay/dlnatvservice/upnp/airkan/
+#   airplaydmr), com.xiaomi.account(+auth), com.starcor.mango, com.xiaodianshi.tv.yst.
+
+# Tracking / content recognition
+com.xiaomi.mitv.kuyun.acr                    # Kuyun ACR: watches what you view and reports it
+
+# Boot-time preload junk
+com.duokan.factorytest                       # factory/aging test entry (Settings 停用 greyed out; pm block works)
+com.duokan.postsale                          # after-sales promo
+com.xiaomi.tv.gallery                        # 时尚画报 Fashion Pictorial feed app
+
+# Promo / upsell / nagware
+com.xiaomi.mitv.shop                         # Xiaomi store promos
+com.xiaomi.tweather                          # weather service
+com.xiaomi.mitv.handbook                     # on-screen manual
+com.xiaomi.mitv.handbook.zh.cn               # on-screen manual (zh)
+com.xiaomi.mitv.calendar                     # calendar service (base calendar already disabled)
+com.xiaomi.tv.appupgrade                     # app-update nags
+com.xiaomi.mibox.gamecenter                  # game center
+com.xiaomi.gamecenter.sdk.service.mibox      # game center SDK service
+com.xiaomi.mitv.tvmanager                    # "TV Manager" cleaner
+com.mitv.gallery                             # Mi Gallery (the media player still opens USB photos)
+com.xiaomi.mimusic                           # Mi Music
+com.xiaomi.mitv.searchcenter                 # PatchWall search center (the remote has no search key)
+
+# Payment / wallet (TV shopping only)
+com.mipay.wallet.tv                          # Mi Pay for TV
+com.xiaomi.mitv.pay                          # Mi TV pay service
+com.xiaomi.mitv.payment                      # Mi TV payment plugin
+
+# Voice + duplicate IME (com.baidu.input enabled and set as default first)
+com.sohu.inputmethod.sogou.tv                # Sogou IME, second keyboard
+com.sogou.speech.offlineservice              # Sogou offline voice; remote voice search dies with it
+
+# Restored at the owner's request, kept out of the list:
+#   com.gitvdemo.video = 银河奇异果 (iQiyi TV): unblocked, shown as a tile.
+#   com.xiaomi.mitv.smartshare = 小米投屏 / Wireless Share: unblocked, it is the casting receiver.
