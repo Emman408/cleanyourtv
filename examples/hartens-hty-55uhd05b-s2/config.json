@@ -1,0 +1,20 @@
+{
+  "dock_apps": [
+    "com.yandex.tv.ytplayer",
+    "ru.kinopoisk.yandex.tv",
+    "com.cultraview.newfilemanager"
+  ],
+  "hidden_apps": [
+    "com.yandex.tv.home"
+  ],
+  "app_labels": [
+    "com.yandex.tv.ytplayer=YouTube",
+    "com.cultraview.newfilemanager=Медиацентр"
+  ],
+  "live_tv_package": "",
+  "input_uri_scheme": "live-tv",
+  "settings_key_keycodes": [176],
+  "columns": 4,
+  "background_color": "#000000",
+  "wallpaper": false
+}

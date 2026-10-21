@@ -10,6 +10,10 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   `tools/tv.py` avoids the binary entirely.
 - **No "wireless debugging" toggle** on some TVs, Xiaomi among them. USB debugging alone opens
   network ADB on port 5555.
+- **No USB debugging toggle at all** on YaOS sets built by CVTE (Hartens): it is "ADB Mode" under
+  "other options" in the CVTE service menu (hold Menu, then Left, Up, Left, Up, Back on the Yandex
+  home screen). "Aging mode" sits next to it and starts a colour burn-in pattern that only a minute
+  off the mains stops. Details in [the Hartens list](../examples/hartens-hty-55uhd05b-s2/debloat.txt).
 - **USB debugging is greyed out and there is no Wireless debugging entry either**, seen on a carrier
   box ([Airtel Xstream, Android 11](https://github.com/Gathin23/cleanyourtv/issues/227)). Some ISP
   firmware removes both switches, and then no shell can be reached: `tools/tv.py` fails,
@@ -338,3 +342,10 @@ change and the denial is back. Seen on a TCL C89B (Google TV 14, `G08`, `UTT2.25
 reads `[TclAppBoot]:forbid bind service ComponentInfo{com.gathin.tvhome/com.gathin.tvhome.HomeKeyService}`
 and whose `appops get` names the op `AUTO_START`: use the name `appops get` prints. When reporting, give the
 model, build, current user and the relevant redacted lines, not the raw dump.
+
+Never enabled at all, on YaOS (Yandex TV OS, Hartens HTY-55UHD05B-S2): `com.yandex.tv.services.platform`
+observes `enabled_accessibility_services` and writes its own list back within milliseconds, so reading
+the setting right after `settings put` already shows only Yandex's `KeyEventInterceptorService`. The
+helpers cannot run there. That interceptor routes Input, Settings and Alice through `com.yandex.tv.home`,
+so keep the stock launcher enabled (not the default Home) and the buttons work from any app; see
+[the Hartens list](../examples/hartens-hty-55uhd05b-s2/debloat.txt).

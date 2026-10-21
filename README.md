@@ -101,7 +101,7 @@ Tested lists from contributors, one folder per model in [`examples/`](examples/)
 **TCL** 43 · **Xiaomi** 24 · **Sony** 23 · **Philips** 10 · **Hisense** 8 · **Skyworth** 7 · **Amazon Fire TV** 6 ·
 **Panasonic** 3 · **Thomson** 3 · **BenQ** 2 · **CHiQ** 2 · **FFalcon** 2 · **Google** 2 · **Haier** 2 · **Hitachi** 2 ·
 **Kalley** 2 · **NVIDIA Shield** 2 · **OnePlus** 2 · **onn** 2 · **Redmi** 2 · **Toshiba** 2 · **Vu** 2 ·
-AiPro2K · AIWA · Artel · Caxium · Cecotec · Challenger · Compac · Dialog · EKO · Freebox · Insignia Fire TV · JVC ·
+AiPro2K · AIWA · Artel · Caxium · Cecotec · Challenger · Compac · Dialog · EKO · Freebox · Hartens · Insignia Fire TV · JVC ·
 Karbonn · Kogan · Motorola · MTC · Noblex · OK. · Polytron · PRISM+ · RCA · Sankey · SANYO · SHARP · Tele System ·
 Verizon · Vidda · Vision ·
 BYINTEK, JMGO, Portronics, Stellamore, Wanbo and XGIMI projectors
@@ -139,6 +139,7 @@ BYINTEK, JMGO, Portronics, Stellamore, Wanbo and XGIMI projectors
 | Google TV Streamer 4K (kirkwood, GZRNL) | Google TV 14 |
 | Haier Android TV DVB2K (broadway, HaierATVT56DVB) | Android TV 11 |
 | Haier H32S80EFX (MatrixTV CE, HRT56EU, deto, MediaTek), Thailand | Google TV 14 |
+| Hartens HTY-55UHD05B-S2 (CVTE CV9632-K55, MediaTek MT9632), Russia | YaOS / Android 9 |
 | Hisense E5Q Pro (VIDAA_TV, MediaTek MT9653), China | Android TV 11 |
 | Hisense Fire TV (AFTCIBFBD1, coyote, MediaTek), US | Fire OS 8.0 / Android 11 |
 | Hisense HG9 (HiSmart 4K A4FFM) | Android TV 9 |
