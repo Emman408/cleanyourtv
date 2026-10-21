@@ -1,10 +1,12 @@
 package com.gathin.tvhome;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
+import android.widget.Toast;
 
 import java.util.Collections;
 import java.util.Map;
@@ -24,6 +26,8 @@ public class HomeKeyService extends AccessibilityService {
     private int[] settingsScancodes = new int[0];
     private int[] settingsKeycodes = new int[0];
     private boolean settingsPanel;
+    private String settingsService;
+    private String settingsAction;
     /** app_keys, the same map InputKeyService reads, for setups that run only this service. */
     private Map<Integer, String> appKeys = Collections.emptyMap();
     private Map<Integer, String> appScancodes = Collections.emptyMap();
@@ -36,6 +40,8 @@ public class HomeKeyService extends AccessibilityService {
         Config config = Config.load(this);
         settingsKeycodes = config.settingsKeycodes;
         settingsPanel = config.settingsKeyPanel;
+        settingsService = config.settingsKeyService;
+        settingsAction = config.settingsKeyAction;
         appKeys = RemoteKeys.parseAppKeys(config.appKeys);
         appScancodes = RemoteKeys.parseAppScancodes(config.appKeys);
     }
@@ -57,10 +63,16 @@ public class HomeKeyService extends AccessibilityService {
         }
         // The stock launcher handled the remote's Settings button; with it disabled the button does nothing.
         if (isSettingsKey(event)) {
-            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+            if (RemoteKeys.isSettingsRelease(event.getAction(), event.getKeyCode(), event.getFlags())) {
+                if (!settingsService.isEmpty() && SystemPanel.open(this, settingsService, settingsAction))
+                    return true;
                 Intent open = settingsPanel ? new Intent(this, QuickSettingsActivity.class)
                         : new Intent(Settings.ACTION_SETTINGS);
-                startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                try {
+                    startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                } catch (ActivityNotFoundException | SecurityException e) {
+                    Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
+                }
             }
             return true;
         }

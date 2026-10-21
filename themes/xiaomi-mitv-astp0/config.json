@@ -1,0 +1,8 @@
+{
+  "live_tv_package": "",
+  "source_panel_service": "com.xiaomi.mitv.settings/.TvSettingService",
+  "source_panel_action": "com.xiaomi.mitv.settings.INPUTSOURCE_POPUP",
+  "settings_key_keycodes": [82],
+  "settings_key_service": "com.xiaomi.mitv.settings/.TvSettingService",
+  "settings_key_action": "com.xiaomi.intent.action.show.globalsetting"
+}

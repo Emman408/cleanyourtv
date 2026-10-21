@@ -76,6 +76,10 @@
          with TV settings, Display, Network, Apps (re-enable an app) and Launcher settings, over whatever is on screen.
          Both keys can also be set from a theme's config.json ("settings_key_keycodes": [83]). -->
     <bool name="settings_key_panel">false</bool>
+    <!-- Optional native Settings panel, opened before the standard Settings/launcher panel.
+         Like source_panel_service, the explicit component may be an activity or a service. -->
+    <string name="settings_key_service" translatable="false"></string>
+    <string name="settings_key_action" translatable="false"></string>
 
     <!-- More remote buttons that open the input switcher, by Android keycode (INPUT_KEY_SERVICE=1
          build-and-install.sh; KEYCODE_TV always does). For buttons only a disabled app answered: the Xiaomi

@@ -4,8 +4,31 @@ import java.util.Map;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 public class RemoteKeysTest {
+    @Test public void settingsOpenOnlyOnRelease() {
+        assertTrue(RemoteKeys.isSettingsRelease(1, 82, 0));
+        assertFalse(RemoteKeys.isSettingsRelease(0, 82, 0));
+    }
+
+    @Test public void canceledSettingsReleaseIsIgnored() {
+        assertFalse(RemoteKeys.isSettingsRelease(1, 82, 0x20));
+        assertFalse(RemoteKeys.isSettingsRelease(1, 176, 0x20));
+    }
+
+    @Test public void xiaomiReinjectedMenuReleaseIsAccepted() {
+        // MiTV-ASTP0 re-injects a short MENU press with MY_SPECIAL_FLAG=30001,
+        // which incidentally contains Android's FLAG_CANCELED bit.
+        assertTrue(RemoteKeys.isSettingsRelease(1, 82, 30001));
+        assertFalse(RemoteKeys.isSettingsRelease(0, 82, 30001));
+    }
+
+    @Test public void xiaomiExceptionDoesNotAcceptOtherCanceledEvents() {
+        assertFalse(RemoteKeys.isSettingsRelease(1, 176, 30001));
+        assertFalse(RemoteKeys.isSettingsRelease(1, 82, 30001 | 0x80));
+    }
+
     private static Map<Integer, String> parse(String... entries) {
         // Key names resolved by a stand-in: android.view.KeyEvent isn't available in JVM tests.
         return RemoteKeys.parseAppKeys(java.util.Arrays.asList(entries),

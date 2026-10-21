@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+// Local opt-in for old Xiaomi firmware whose STR wake broadcast omits
+// FLAG_RECEIVER_INCLUDE_BACKGROUND. Keep the normal Android 14 target by default.
+def legacyXiaomiWake = providers.gradleProperty('legacyXiaomiWake').getOrElse('false').toBoolean()
+
 android {
     namespace 'com.gathin.tvhome'
     compileSdk 34
@@ -10,9 +14,14 @@ android {
         // Opt-in identity for firmware with a package-name HOME allowlist; see docs/devices/xiaomi-mitv-aetp0-dofus.md.
         applicationId providers.gradleProperty('launcherApplicationId').getOrElse('com.gathin.tvhome')
         minSdk 26
-        targetSdk 34
+        targetSdk legacyXiaomiWake ? 25 : 34
         versionCode 6
         versionName '2.5'
+    }
+
+    lint {
+        // This legacy profile is sideloaded locally, not submitted to Google Play.
+        if (legacyXiaomiWake) disable 'ExpiredTargetSdkVersion'
     }
 
     buildTypes {

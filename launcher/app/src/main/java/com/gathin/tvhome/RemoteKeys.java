@@ -19,6 +19,12 @@ import java.util.function.ToIntFunction;
 final class RemoteKeys {
     private RemoteKeys() { }
 
+    /** MiTV's short-MENU re-injection uses 30001, including Android's canceled bit. */
+    static boolean isSettingsRelease(int action, int keyCode, int flags) {
+        return action == KeyEvent.ACTION_UP && ((flags & KeyEvent.FLAG_CANCELED) == 0
+                || (keyCode == KeyEvent.KEYCODE_MENU && flags == 30001));
+    }
+
     /** keycode -> package, with key names resolved by Android. */
     static Map<Integer, String> parseAppKeys(String[] entries) {
         return parseAppKeys(Arrays.asList(entries), KeyEvent::keyCodeFromString);

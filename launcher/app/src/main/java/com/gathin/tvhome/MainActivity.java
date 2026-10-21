@@ -182,6 +182,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** config settings_key_keycodes / settings_key_panel, so the Settings button works on Home without HomeKeyService. */
     private int[] settingsKeycodes = new int[0];
     private boolean settingsKeyPanel;
+    private String settingsKeyService;
+    private String settingsKeyAction;
     /** Calmer motion for weak GPUs (config.xml, reduced_motion): stiff spring, short fades, no replay. */
     private boolean reducedMotion;
     /** config.xml dock_row: the first row is a separate dock (band, parked low, top shelf) rather than plain grid. */
@@ -307,6 +309,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         Config cfg = Config.load(this);
         settingsKeycodes = cfg.settingsKeycodes;
         settingsKeyPanel = cfg.settingsKeyPanel;
+        settingsKeyService = cfg.settingsKeyService;
+        settingsKeyAction = cfg.settingsKeyAction;
         COLUMNS = cfg.columns;
         animations = cfg.animations;
         advancedEffects = cfg.animations && cfg.advancedEffects;
@@ -866,7 +870,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean handleSettingsKey(KeyEvent event) {
         for (int code : settingsKeycodes) {
             if (event.getKeyCode() != code) continue;
-            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+            if (RemoteKeys.isSettingsRelease(event.getAction(), event.getKeyCode(), event.getFlags())) {
+                if (!settingsKeyService.isEmpty()
+                        && SystemPanel.open(this, settingsKeyService, settingsKeyAction)) return true;
                 open(settingsKeyPanel ? new Intent(this, QuickSettingsActivity.class)
                         : systemIntent(Settings.ACTION_SETTINGS));
             }
@@ -2209,16 +2215,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** The TV's own source-selection panel, for TVs that have no TvInputManager (TCL Android TV 9): a
      *  service, or an activity on sets whose panel is a dialog (BYINTEK U4's QuickSourceActivity). */
     private void openSourcePanel() {
-        Intent i = new Intent(sourcePanelAction);
-        ComponentName c = ComponentName.unflattenFromString(sourcePanelService);
-        if (c != null) i.setComponent(c);
-        try {
-            if (getPackageManager().resolveActivity(i, 0) != null) {
-                startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                return;
-            }
-            startService(i);
-        } catch (Exception e) {
+        if (!SystemPanel.open(this, sourcePanelService, sourcePanelAction)) {
             Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
         }
     }
