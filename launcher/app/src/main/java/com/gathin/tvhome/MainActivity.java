@@ -120,6 +120,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private String liveTvInputId;
     /** The app library is on (config.xml, app_library): only then can the tile menu take an app off Home. */
     private boolean appLibraryEnabled;
+    private boolean appLibrarySearch;
     /** The same opt-in menu is available from either hold-OK or the remote's Menu key. */
     private boolean tileMenuEnabled;
     private String inputAction;
@@ -369,6 +370,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         liveTvAction = cfg.liveTvAction;
         liveTvInputId = cfg.liveTvInputId;
         appLibraryEnabled = cfg.appLibrary;
+        appLibrarySearch = cfg.appLibrarySearch;
         tileMenuEnabled = cfg.tileMenu;
         inputAction = cfg.inputAction;
         inputUriScheme = cfg.inputUriScheme;
@@ -1431,7 +1433,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (openPopup != null) openPopup.dismiss();
         libraryFocusPending = false;
         libraryFromTopBar = false;
-        appLibrary = new AppLibraryDialog(this, animations, reducedMotion, adapter::containsPackage, () -> reloadApps(false), () -> {
+        appLibrary = new AppLibraryDialog(this, animations, reducedMotion, appLibrarySearch, adapter::containsPackage, () -> reloadApps(false), () -> {
             appLibrary = null;
             openPopup = null;
             if (libraryFromTopBar) {

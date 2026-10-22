@@ -259,6 +259,8 @@
 
     <!-- Installed launchable apps, including ordinary Android apps. Also settable in config.json. -->
     <bool name="app_library">false</bool>
+    <!-- Optional local search in App library; requires app_library. A theme can enable it. -->
+    <bool name="app_library_search">false</bool>
 
     <!-- Apps pre-seeded into the App library's "added" set at startup (config.xml library_apps, or a theme's
          config.json). They show on Home as if the owner had added them in the App library UI, and stay

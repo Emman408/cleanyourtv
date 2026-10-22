@@ -44,3 +44,12 @@ bound cards. The highlight follows the launcher's animation setting, including
 instant movement when animations are off. There is no polling, network, backdrop capture, new service,
 permission or dependency. The additional manifest query covers ordinary
 LAUNCHER activities on Android 11 and later.
+
+## Optional local search
+
+Set `app_library_search` to `true` in a theme or config.xml (with `app_library` enabled).
+Up from an app reaches Search; OK opens the TV keyboard. Search/Done, or Down after
+leaving the keyboard, reaches the results. The × button clears the query. Back first
+leaves the keyboard, then closes the library. Search supports partial names, case and
+accents, and preserves the library groups and existing app actions. Queries last only
+for this opening and survive package refreshes; they are never saved or sent anywhere.

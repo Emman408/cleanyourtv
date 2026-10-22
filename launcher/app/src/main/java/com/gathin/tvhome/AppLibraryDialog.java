@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -17,11 +18,17 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.ViewTreeObserver;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -42,6 +49,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -49,7 +57,8 @@ import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 /** On-demand installed-app picker. Uses the launcher's glass resources; no backdrop capture or blur. */
-final class AppLibraryDialog {
+final class AppLibraryDialog implements TextWatcher, View.OnClickListener,
+        View.OnFocusChangeListener, View.OnKeyListener, TextView.OnEditorActionListener {
     /**
      * The catalogue, the labels and the icons load here, off the UI thread: each label and icon opens the app's
      * resources, and on a TCL G09 that froze Home for 60-140 ms (2 to 4 janky frames) every time the library opened.
@@ -83,6 +92,13 @@ final class AppLibraryDialog {
     private final boolean reducedMotion;
     private final boolean animations;
     private final boolean rtl;
+    private int focusRequest;
+    private final boolean searchEnabled;
+    private final Locale searchLocale;
+    private EditText search;
+    private TextView clearSearch, searchCount, noMatches;
+    private List<ResolveInfo> unfiltered = new ArrayList<>();
+    private final Map<String, String> searchKeys = new HashMap<>();
     private TextView instructions;
     private int totalApps;
     final PopupWindow popup;
@@ -142,9 +158,11 @@ final class AppLibraryDialog {
         if (popup.isShowing()) popup.update(width, height);
     }
 
-    AppLibraryDialog(Activity activity, boolean animations, boolean reducedMotion, Predicate<String> onHome, Runnable changed, Runnable dismissed) {
+    AppLibraryDialog(Activity activity, boolean animations, boolean reducedMotion, boolean searchEnabled, Predicate<String> onHome, Runnable changed, Runnable dismissed) {
         this.activity = activity;
         this.animations = animations;
+        this.searchEnabled = searchEnabled;
+        this.searchLocale = activity.getResources().getConfiguration().getLocales().get(0);
         this.rtl = activity.getResources().getBoolean(R.bool.rtl_app_grid);
         this.reducedMotion = reducedMotion;
         this.onHome = onHome;
@@ -164,8 +182,13 @@ final class AppLibraryDialog {
         popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         popup.setOutsideTouchable(true);
         popup.setAnimationStyle(0);
+        if (searchEnabled) {
+            popup.setInputMethodMode(PopupWindow.INPUT_METHOD_NEEDED);
+            popup.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
         popup.setOnDismissListener(() -> {
             closed = true;
+            hideKeyboard();
             dismissActions();
             stopHighlight();
             icons.clear();
@@ -230,6 +253,7 @@ final class AppLibraryDialog {
                 }
             }
             Map<String, String> names = new HashMap<>();
+            Map<String, String> keys = new HashMap<>();
             Map<String, Long> installed = new HashMap<>();
             for (Map.Entry<String, ResolveInfo> entry : unique.entrySet()) {
                 String pkg = entry.getKey();
@@ -247,6 +271,7 @@ final class AppLibraryDialog {
                     KNOWN.put(pkg, known);
                 }
                 names.put(pkg, known.label);
+                if (searchEnabled) keys.put(pkg, AppSearch.key(known.label, searchLocale));
             }
             KNOWN.keySet().retainAll(unique.keySet());
             main.post(() -> {
@@ -257,6 +282,7 @@ final class AppLibraryDialog {
                 installTimes.putAll(installed);
                 labels.clear();
                 labels.putAll(names);
+                if (searchEnabled) { searchKeys.clear(); searchKeys.putAll(keys); }
                 fill(new ArrayList<>(unique.values()));
                 if (loads.takeReveal()) reveal();
             });
@@ -281,7 +307,11 @@ final class AppLibraryDialog {
             int byLabel = collator.compare(label(a), label(b));
             return byLabel != 0 ? byLabel : pa.compareTo(pb);
         });
-        showCatalog();
+        if (searchEnabled) {
+            unfiltered = apps;
+            applyQuery();
+            if (search == null) showCatalog();
+        } else showCatalog();
     }
 
     private String label(ResolveInfo app) {
@@ -333,7 +363,7 @@ final class AppLibraryDialog {
 
     private void showCatalog() {
         stopHighlight();
-        resize(catalogWidth, dp(280));
+        resize(catalogWidth, dp(searchEnabled ? 328 : 280));
         panel.removeAllViews();
         LinearLayout header = new LinearLayout(activity);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -347,14 +377,21 @@ final class AppLibraryDialog {
                 R.plurals.library_app_count, totalApps, totalApps), 13, 0xA6FFFFFF);
         count.setSingleLine(true);
         header.addView(count, new LinearLayout.LayoutParams(-2, -2));
+        searchCount = count;
+        if (searchEnabled) {
+            // Hebrew uses explicit mirroring: the base manifest does not enable automatic RTL layouts.
+            header.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            if (rtl) { header.removeView(count); header.addView(count, 0); }
+        }
         panel.addView(header, new LinearLayout.LayoutParams(-1, dp(44)));
+        if (searchEnabled) addSearch();
         instructions = text(activity.getString(R.string.library_hint_add), 13, 0xBBFFFFFF);
         instructions.setSingleLine(true);
         instructions.setEllipsize(TextUtils.TruncateAt.END);
         instructions.setPadding(dp(12), 0, dp(12), dp(6));
         panel.addView(instructions, new LinearLayout.LayoutParams(-1, dp(26)));
         panel.setFocusableInTouchMode(apps.isEmpty());
-        if (apps.isEmpty()) {
+        if (apps.isEmpty() && !searchEnabled) {
             instructions.setVisibility(View.GONE);
             heading(activity.getString(R.string.library_empty));
             panel.setFocusableInTouchMode(true);
@@ -383,6 +420,13 @@ final class AppLibraryDialog {
         highlight.setFocusable(false);
         highlight.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         shelf.addView(highlight, new FrameLayout.LayoutParams(dp(144), dp(180)));
+        if (searchEnabled) {
+            noMatches = text(activity.getResources().getQuantityString(R.plurals.library_app_count, 0, 0), 18, 0xBBFFFFFF);
+            noMatches.setGravity(Gravity.CENTER);
+            shelf.addView(noMatches, new FrameLayout.LayoutParams(-1, -1));
+            noMatches.setVisibility(apps.isEmpty() ? View.VISIBLE : View.GONE);
+            instructions.setVisibility(apps.isEmpty() ? View.INVISIBLE : View.VISIBLE);
+        }
         scrollOffset = 0;
         spring = new SpringAnimation(highlight, new FloatPropertyCompat<View>("libraryScrollX") {
             @Override public float getValue(View view) { return view.getTranslationX() + scrollOffset; }
@@ -397,6 +441,11 @@ final class AppLibraryDialog {
             }
         });
         panel.addView(shelf, new LinearLayout.LayoutParams(-1, 0, 1));
+        if (searchEnabled) {
+            if (!apps.isEmpty()) catalog.requestFocus();
+            focusResults();
+            return;
+        }
         int position = Math.min(selectedPosition, apps.size() - 1);
         for (int i = 0; i < apps.size(); i++) {
             if (apps.get(i).activityInfo.packageName.equals(selectedPackage)) { position = i; break; }
@@ -407,6 +456,163 @@ final class AppLibraryDialog {
             if (catalog != list || !popup.isShowing()) return;
             RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(target);
             if (holder != null) holder.itemView.requestFocus();
+        });
+    }
+
+    private void hideKeyboard() {
+        if (search != null) ((InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE))
+                .hideSoftInputFromWindow(search.getWindowToken(), 0);
+    }
+
+    // These existing ColorStateList selectors live in drawable, as in the launcher XML textColor attributes.
+    @android.annotation.SuppressLint("ResourceType")
+    private void addSearch() {
+        LinearLayout row = new LinearLayout(activity);
+        row.setPadding(dp(10), 0, dp(10), dp(4));
+        search = new EditText(activity);
+        search.setId(R.id.librarySearch);
+        search.setBackgroundResource(R.drawable.input_row_bg);
+        search.setPadding(dp(12), 0, dp(12), 0);
+        search.setHint(android.R.string.search_go);
+        search.setTextSize(16);
+        search.setTypeface(UiFont.get(activity, R.string.font_medium));
+        search.setTextColor(activity.getColorStateList(R.drawable.pill_text));
+        search.setHintTextColor(activity.getColorStateList(R.drawable.pill_text_dim));
+        search.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        search.setSingleLine(true);
+        search.setSelectAllOnFocus(true);
+        search.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(64)});
+        search.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        search.setImeOptions(EditorInfo.IME_ACTION_SEARCH | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        row.addView(search, new LinearLayout.LayoutParams(0, -1, 1));
+        clearSearch = text("×", 24, Color.WHITE);
+        clearSearch.setId(R.id.librarySearchClear);
+        clearSearch.setTextColor(activity.getColorStateList(R.drawable.pill_text));
+        clearSearch.setBackgroundResource(R.drawable.input_row_bg);
+        clearSearch.setGravity(Gravity.CENTER);
+        // The platform's translated Cancel action ends this filter and restores the whole catalogue.
+        clearSearch.setContentDescription(activity.getString(android.R.string.cancel));
+        clearSearch.setFocusable(true);
+        clearSearch.setVisibility(View.INVISIBLE);
+        row.addView(clearSearch, new LinearLayout.LayoutParams(dp(44), -1));
+        search.setOnFocusChangeListener(this);
+        search.setOnClickListener(this);
+        search.setOnEditorActionListener(this);
+        search.setOnKeyListener(this);
+        search.addTextChangedListener(this);
+        clearSearch.setOnFocusChangeListener(this);
+        clearSearch.setOnClickListener(this);
+        clearSearch.setOnKeyListener(this);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        if (rtl) {
+            row.removeView(clearSearch);
+            row.addView(clearSearch, 0);
+        }
+        panel.addView(row, new LinearLayout.LayoutParams(-1, dp(44)));
+    }
+
+    /** Shared handlers for search and Clear; native editing and cursor navigation remain with EditText. */
+    @Override public void onFocusChange(View view, boolean focused) {
+        if (!focused) return;
+        if (view == clearSearch) focusRequest++;
+        else if (highlight != null) { highlightShown = false; highlight.setAlpha(0f); }
+    }
+    @Override public void onClick(View view) {
+        if (view == clearSearch) { focusSearch(); search.setText(""); }
+        else {
+            focusRequest++;
+            ((InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE))
+                    .showSoftInput(search, InputMethodManager.SHOW_IMPLICIT);
+        }
+    }
+    @Override public boolean onEditorAction(TextView view, int action, KeyEvent event) {
+        if (action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_DONE
+                || event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                && event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+            hideKeyboard(); focusResults(); return true;
+        }
+        return false;
+    }
+    @Override public boolean onKey(View view, int key, KeyEvent event) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+        if (key == KeyEvent.KEYCODE_DPAD_DOWN) { hideKeyboard(); focusResults(); return true; }
+        if (view == clearSearch) {
+            if (key == (rtl ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT)) {
+                focusSearch(); return true;
+            }
+            return key == KeyEvent.KEYCODE_DPAD_UP
+                    || key == (rtl ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT);
+        }
+        if (key == (rtl ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT)
+                && clearSearch.getVisibility() == View.VISIBLE
+                && search.getSelectionStart() == search.getSelectionEnd()) {
+            android.text.Layout layout = search.getLayout();
+            int cursor = search.getSelectionEnd();
+            if (layout != null && cursor >= 0 && Math.abs(layout.getPrimaryHorizontal(cursor)
+                    - (rtl ? layout.getLineLeft(0) : layout.getLineRight(0))) < 1f) {
+                clearSearch.requestFocus(); return true;
+            }
+        }
+        return key == KeyEvent.KEYCODE_DPAD_UP;
+    }
+    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+    @Override public void onTextChanged(CharSequence s, int start, int before, int count) { applyQuery(); }
+    @Override public void afterTextChanged(Editable s) { }
+
+    /** Filter loaded names only: editing text never starts a package query or replaces the input view. */
+    @android.annotation.SuppressLint("NotifyDataSetChanged") // Filtering can remove and reorder any subset.
+    private void applyQuery() {
+        focusRequest++;
+        boolean restore = catalog != null && catalog.hasFocus();
+        String query = search == null ? "" : search.getText().toString();
+        String[] words = AppSearch.words(query, searchLocale);
+        List<ResolveInfo> matches = new ArrayList<>();
+        int selected = -1;
+        for (ResolveInfo info : unfiltered) {
+            String pkg = info.activityInfo.packageName;
+            if (!AppSearch.matches(searchKeys.get(pkg), words)) continue;
+            if (pkg.equals(selectedPackage)) selected = matches.size();
+            matches.add(info);
+        }
+        apps = matches;
+        selectedPosition = AppSearch.focusIndex(selected, selectedPosition, apps.size());
+        if (search == null) return;
+        searchCount.setText(activity.getResources().getQuantityString(R.plurals.library_app_count,
+                apps.size(), apps.size()));
+        if (query.isEmpty() && clearSearch.hasFocus()) focusSearch();
+        clearSearch.setVisibility(query.isEmpty() ? View.INVISIBLE : View.VISIBLE);
+        noMatches.setVisibility(apps.isEmpty() ? View.VISIBLE : View.GONE);
+        instructions.setVisibility(apps.isEmpty() ? View.INVISIBLE : View.VISIBLE);
+        spring.cancel();
+        highlightShown = false;
+        highlight.setAlpha(0f);
+        catalog.stopScroll();
+        catalog.getAdapter().notifyDataSetChanged();
+        if (restore) focusResults();
+    }
+
+    /** Explicit user navigation cancels deferred card focus; automatic focus during a rebind does not. */
+    private void focusSearch() {
+        focusRequest++;
+        search.requestFocus();
+    }
+
+    /** Layout has finished before focus is requested, including when the target is initially off screen. */
+    private void focusResults() {
+        if (apps.isEmpty()) { if (search != null) focusSearch(); return; }
+        RecyclerView list = catalog;
+        int request = ++focusRequest;
+        int position = Math.max(0, Math.min(selectedPosition, apps.size() - 1));
+        ((LinearLayoutManager) list.getLayoutManager()).scrollToPositionWithOffset(position, 0);
+        list.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                if (list.getViewTreeObserver().isAlive()) list.getViewTreeObserver().removeOnPreDrawListener(this);
+                if (!closed && catalog == list && popup.isShowing() && focusRequest == request) {
+                    RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(position);
+                    if (holder != null) holder.itemView.requestFocus();
+                }
+                return true;
+            }
         });
     }
 
@@ -627,6 +833,12 @@ final class AppLibraryDialog {
             });
             holder.itemView.setOnKeyListener((v, key, event) -> {
                 int index = holder.getBindingAdapterPosition();
+                if (searchEnabled && event.getAction() == KeyEvent.ACTION_DOWN && key == KeyEvent.KEYCODE_DPAD_UP) {
+                    focusSearch();
+                    highlightShown = false;
+                    highlight.setAlpha(0f);
+                    return true;
+                }
                 return event.getAction() == KeyEvent.ACTION_DOWN && (key == KeyEvent.KEYCODE_DPAD_UP
                         || key == KeyEvent.KEYCODE_DPAD_DOWN
                         || (rtl ? key == KeyEvent.KEYCODE_DPAD_RIGHT : key == KeyEvent.KEYCODE_DPAD_LEFT) && index == 0
