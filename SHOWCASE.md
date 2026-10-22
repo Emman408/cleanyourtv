@@ -10,7 +10,7 @@ project's own issue tracker.
 
 **Jump to:** [Home screens built as their own app](#home-screens-built-as-their-own-app) · [Forks of the launcher](#forks-of-the-launcher) · [Screensavers and add-ons](#screensavers-and-add-ons) · [Tools and companion apps](#tools-and-companion-apps) · [Other platforms: Fire TV and LG webOS](#other-platforms-fire-tv-and-lg-webos) · [Add-ons in this repo](addons/README.md) · [Guides and write-ups](#guides-and-write-ups) · [Find a project by TV brand](#find-a-project-by-tv-brand) · [Add yours](#add-yours)
 
-44 projects so far.
+45 projects so far.
 
 ## Home screens built as their own app
 
@@ -89,6 +89,7 @@ Fire OS won't let another launcher replace Amazon's home, and LG TVs run webOS r
 | [Fire OS 7 fast Home](https://github.com/andrewsaad/fire-tv-cleanup) | A fork of fire-tv-cleanup for Fire OS 7 (Android 9), where Android holds any background app back for 5 s after Home: the accessibility service clicks the launcher's own tile in Amazon's apps row instead, so Amazon opens it in about 0.6 s. Also a boot guard for apps that open themselves at boot, Windows PowerShell scripts and an AFTALMO debloat list | Amazon Fire TV AFTALMO, Fire OS 7.7 / Android 9 | [andrewsaad](https://github.com/andrewsaad) |
 | [Fire TV Glass](https://github.com/ivantrj/firetv-glass-launcher) | Debloat scripts and a small Glass launcher for Fire OS 8, which protects Amazon's home: an accessibility service brings Glass back whenever Amazon's home appears. Dock, hidden apps and wallpaper change without a rebuild | Fire TV Stick 4K (AFTKRT), Fire OS 8 / Android 11 | [ivantrj](https://github.com/ivantrj) |
 | [fire-tv-cleanup](https://github.com/itsmeterrylin/fire-tv-cleanup) | A fork aimed at Fire TV: debloat plus a launcher with a macOS-style dock | Fire TV | [itsmeterrylin](https://github.com/itsmeterrylin) |
+| [TB for LG webOS](https://github.com/youngwiseone/tb-webos) ([issues](https://github.com/youngwiseone/tb-webos/issues), [changes](https://github.com/youngwiseone/tb-webos/blob/main/CHANGELOG.md)) | A PS2-inspired webOS home built on partridgeworks/webos-launcher: memory-card apps/HDMI, six recent shortcuts, a drifting idle view and original time-of-day startup visuals. Adds Internet/IP details and LG Wi-Fi settings; optional Homebrew discovery/picture controls and a separately configured Steam friends relay | LG OLED48C24LA, webOS 24; personal implementation TV-tested, public 0.1.1 PC-tested | [youngwiseone](https://github.com/youngwiseone) |
 | [webOS launcher](https://github.com/OmkarK97/webos-vibehack) | The same Apple TV-style home rebuilt as a webOS web app for LG TVs, installed through LG's Developer Mode, with a Home-button watcher that runs on another device | LG OLED C6, webOS 26 | [OmkarK97](https://github.com/OmkarK97) |
 
 ## Add-ons in this repo
@@ -113,7 +114,7 @@ By the TV each project was built and tested on. Most of them run on other Androi
 - **FPT Play:** [TV Remote](https://github.com/HoangTran0410/tv-remote)
 - **Haier:** [cleanyourtv for Haier](https://github.com/abuhasanrumi/cleanyourtv-haier)
 - **Hisense:** [Hisense 55U6K: reorder and weather](https://github.com/vlaship/cleanyourtv/tree/hisense-55u6k), [Hisense restyle](https://github.com/YouLop009/tv-vibehack/tree/style-modifications)
-- **LG:** [CleanYourTV for LG webOS](https://github.com/lasharor/cleanyourtv-WebOS), [webOS launcher](https://github.com/OmkarK97/webos-vibehack)
+- **LG:** [CleanYourTV for LG webOS](https://github.com/lasharor/cleanyourtv-WebOS), [webOS launcher](https://github.com/OmkarK97/webos-vibehack), [TB for LG webOS](https://github.com/youngwiseone/tb-webos)
 - **Motorola:** [TV Motorola Launcher](https://github.com/kartikcool15/tv-motorola-launcher)
 - **MYO:** [MYO Launcher](https://github.com/faustinoaq/myo-launcher)
 - **NVIDIA Shield:** [Vibe Launcher](https://github.com/maydings/vibe-launcher)
