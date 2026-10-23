@@ -7,6 +7,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.os.UserManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -26,7 +30,9 @@ import java.util.Set;
  * the stock launcher is disabled the button does nothing. Every other key passes through untouched.
  *
  * With stock_home_redirect set, it also sends the stock launcher's home screen back here, for firmware that turns
- * that launcher on again after it was disabled (XGIMI's xrmservice does, on its own remote keys).
+ * that launcher on again after it was disabled (XGIMI's xrmservice does, on its own remote keys), and on Google TV
+ * with launcherx left enabled so voice search can show its results (StockHomeRedirect has the details). Only then
+ * does it ask for window state changes, and it comes forward once if bound shortly after boot.
  *
  * Enable over adb:
  *   settings put secure enabled_accessibility_services com.gathin.tvhome/.HomeKeyService
@@ -50,6 +56,17 @@ public class HomeKeyService extends AccessibilityService {
     private BroadcastReceiver unlockReceiver;
     /** The stock launcher's HOME activities (stock_home_redirect), disabled ones included. */
     private final Set<String> stockHome = new HashSet<>();
+    /** stock_home_redirect's state; null when it is not set. */
+    private StockHomeRedirect redirect;
+    /** key_filter from the config: key filtering is on when it says so, or while voice results are up. */
+    private boolean keyFilter = true;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable goHome = this::openHome;
+    private final Runnable focusResults = () -> {
+        if (redirect != null && redirect.inResults() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            performGlobalAction(GLOBAL_ACTION_DPAD_DOWN);
+        }
+    };
 
     @Override
     protected void onServiceConnected() {
@@ -86,6 +103,8 @@ public class HomeKeyService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(goHome);
+        handler.removeCallbacks(focusResults);
         stopWaitingForUnlock();
         super.onDestroy();
     }
@@ -101,8 +120,10 @@ public class HomeKeyService extends AccessibilityService {
         settingsPanel = config.settingsKeyPanel;
         appKeys = RemoteKeys.parseAppKeys(config.appKeys);
         appScancodes = RemoteKeys.parseAppScancodes(config.appKeys);
+        keyFilter = config.keyFilter;
         RemoteKeys.applyKeyFilter(this, config.keyFilter);
         stockHome.clear();
+        redirect = null;
         if (!config.stockHomeRedirect.isEmpty()) {
             Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(config.stockHomeRedirect);
             for (ResolveInfo ri : getPackageManager().queryIntentActivities(home, PackageManager.MATCH_DISABLED_COMPONENTS)) {
@@ -115,8 +136,30 @@ public class HomeKeyService extends AccessibilityService {
             info.eventTypes |= AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
             setServiceInfo(info);
         }
+        if (!stockHome.isEmpty()) {
+            redirect = new StockHomeRedirect(config.stockHomeRedirect, getPackageName(), stockHome);
+            // Bound at boot, after the stock launcher has already put its home screen up: come forward once.
+            if (SystemClock.elapsedRealtime() < 3 * 60_000) openHome();
+        }
         holdAppKeys = RemoteKeys.parseHoldAppKeys(config.appKeys);
         holdAppScancodes = RemoteKeys.parseHoldAppScancodes(config.appKeys);
+    }
+
+    private void openHome() {
+        startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(getPackageName())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+    }
+
+    /** Key filtering follows key_filter, plus the voice results: Home pressed there brings no new window. */
+    private void filterKeys() {
+        AccessibilityServiceInfo info = getServiceInfo();
+        if (info == null) return;
+        if (keyFilter || (redirect != null && redirect.inResults())) {
+            info.flags |= AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
+        } else {
+            info.flags &= ~AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
+        }
+        setServiceInfo(info);
     }
 
     private boolean isSettingsKey(KeyEvent event) {
@@ -128,6 +171,14 @@ public class HomeKeyService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
+        // stock_home_redirect: Home on the voice results, where the stock home screen is already up.
+        if (redirect != null && redirect.inResults() && event.getKeyCode() == KeyEvent.KEYCODE_HOME) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled() && redirect.onHomeKey()) {
+                filterKeys();
+                openHome();
+            }
+            return true;
+        }
         // A scancode entry is more specific than any keycode, so it goes first.
         if (RemoteKeys.handle(this, event, appScancodes.get(event.getScanCode()),
                 holdAppScancodes.get(event.getScanCode()))) return true;
@@ -147,13 +198,7 @@ public class HomeKeyService extends AccessibilityService {
         if (RemoteKeys.handle(this, event, appKeys.get(event.getKeyCode()),
                 holdAppKeys.get(event.getKeyCode()))) return true;
         if (event.getKeyCode() != KeyEvent.KEYCODE_ALL_APPS) return false;
-        if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-            Intent home = new Intent(Intent.ACTION_MAIN)
-                    .addCategory(Intent.CATEGORY_HOME)
-                    .setPackage(getPackageName())
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            startActivity(home);
-        }
+        if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) openHome();
         return true;
     }
 
@@ -166,13 +211,19 @@ public class HomeKeyService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // stock_home_redirect: the firmware turned the stock launcher back on and its home screen came up.
-        if (stockHome.isEmpty() || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        // stock_home_redirect: the stock launcher's home screen came up (see StockHomeRedirect).
+        if (redirect == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        CharSequence pkg = event.getPackageName();
         CharSequence cls = event.getClassName();
-        if (cls != null && stockHome.contains(cls.toString())) {
-            startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(getPackageName())
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+        StockHomeRedirect.Step step = redirect.onWindow(pkg == null ? null : pkg.toString(),
+                cls == null ? null : cls.toString(), SystemClock.elapsedRealtime());
+        if (step.cancelRedirect) handler.removeCallbacks(goHome);
+        if (step.redirectIn >= 0) handler.postDelayed(goHome, step.redirectIn);
+        if (step.focusIn >= 0) {
+            handler.removeCallbacks(focusResults);
+            handler.postDelayed(focusResults, step.focusIn);
         }
+        if (step.resultsChanged) filterKeys();
     }
 
     @Override

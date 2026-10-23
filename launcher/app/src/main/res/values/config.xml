@@ -171,7 +171,14 @@
     <!-- Package of the stock launcher, for TVs whose firmware turns it back on after it was disabled. XGIMI's
          com.xgimi.xrmservice does, on every one of its remote keys, power included (docs/TROUBLESHOOTING.md).
          Whenever that launcher's home screen comes up anyway, HomeKeyService (HOME_KEY_SERVICE=1) sends the TV
-         straight back here. A theme's config.json can set it too. Leave empty to omit. -->
+         straight back here. Also for Google TV with launcherx left enabled, because voice search shows its
+         results in launcherx's home screen (docs/TROUBLESHOOTING.md): set com.google.android.apps.tv.launcherx
+         and keep launcherx enabled, so it stays the system Home; this launcher comes forward on Home, after
+         Back out of an app and at boot, while the voice results, the profile chooser and quick settings are
+         left on screen. build-and-install.sh's Home check stops before enabling the helper there (Home is not
+         this launcher on purpose): enable it as HomeKeyService's header shows. With key_filter false the remote
+         keeps its key repeat; keys are then filtered only while voice results are up, to catch Home there.
+         A theme's config.json can set it too. Leave empty to omit. -->
     <string name="stock_home_redirect" translatable="false"></string>
 
     <!-- Show the Solar Hijri (Shamsi) date used in Iran and Afghanistan, e.g. "27 Mehr 1405", above the
