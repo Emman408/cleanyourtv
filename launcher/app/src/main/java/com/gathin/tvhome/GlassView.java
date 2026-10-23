@@ -26,6 +26,8 @@ public class GlassView extends View {
     private int glowRgb = 0xFFFFFF;
     /** Glow strength: the white glow stays faint, a coloured one needs more alpha to read as warm light. */
     private int glowAlpha = 0x30;
+    /** Minimal highlight (config.xml focus_subtle): far fainter fill, sheen and rim. */
+    private boolean subtle;
 
     public GlassView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -45,15 +47,16 @@ public class GlassView extends View {
     void setAccent(int argb) {
         if (argb == 0) {
             glowRgb = 0xFFFFFF;
-            glowAlpha = 0x30;
-            rim.setColor(0xCCFFFFFF);
+            glowAlpha = subtle ? 0x10 : 0x30;
+            rim.setColor(subtle ? 0x33FFFFFF : 0xCCFFFFFF);
+            rim.setStrokeWidth((subtle ? 1f : 1.5f) * density);
         } else {
             glowRgb = argb & 0xFFFFFF;
-            glowAlpha = 0x70;
+            glowAlpha = subtle ? 0x40 : 0x70;
             // The rim is the accent lifted towards white, so the edge still reads as glass, not paint.
             int r = (((glowRgb >> 16) & 0xFF) + 255 * 2) / 3, g = (((glowRgb >> 8) & 0xFF) + 255 * 2) / 3,
                     b = ((glowRgb & 0xFF) + 255 * 2) / 3;
-            rim.setColor(0xE6000000 | (r << 16) | (g << 8) | b);
+            rim.setColor((subtle ? 0x99 : 0xE6) << 24 | (r << 16) | (g << 8) | b);
         }
         invalidate();
     }
@@ -63,11 +66,35 @@ public class GlassView extends View {
         invalidate();
     }
 
+    /** Minimal highlight: a soft, faint rim and sheen instead of the bright glass slab. */
+    void setSubtle(boolean on) {
+        subtle = on;
+        if (on) {
+            glowAlpha = 0x10;
+            rim.setColor(0x33FFFFFF);
+            rim.setStrokeWidth(1f * density);
+        } else {
+            glowAlpha = 0x30;
+            rim.setColor(0xCCFFFFFF);
+            rim.setStrokeWidth(1.5f * density);
+        }
+        applyShaders(getWidth(), getHeight());
+        invalidate();
+    }
+
+    private void applyShaders(int w, int h) {
+        if (w <= 0 || h <= 0) return;
+        int fillTop = subtle ? 0x14FFFFFF : 0x3DFFFFFF;
+        int fillBottom = subtle ? 0x05FFFFFF : 0x12FFFFFF;
+        int specTop = subtle ? 0x1AFFFFFF : 0x66FFFFFF;
+        fill.setShader(new LinearGradient(0, 0, 0, h, fillTop, fillBottom, Shader.TileMode.CLAMP));
+        specular.setShader(new LinearGradient(0, 0, 0, h * 0.45f, specTop, 0x00FFFFFF, Shader.TileMode.CLAMP));
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        fill.setShader(new LinearGradient(0, 0, 0, h, 0x3DFFFFFF, 0x12FFFFFF, Shader.TileMode.CLAMP));
-        specular.setShader(new LinearGradient(0, 0, 0, h * 0.45f, 0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+        applyShaders(w, h);
     }
 
     @Override
