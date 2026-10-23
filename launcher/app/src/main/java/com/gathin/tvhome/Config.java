@@ -182,6 +182,10 @@ final class Config {
     final boolean dockGlass;
     /** The dock band's padding equals the gap between its tiles (config.xml, dock_even_padding); false keeps the fixed padding. */
     final boolean dockEvenPadding;
+    /** Draw the dock band and its edge (config.xml dock_band); false leaves the tiles floating on the wallpaper. */
+    final boolean dockBand;
+    /** A minimal focus highlight instead of the bright glass slab (config.xml focus_subtle). */
+    final boolean focusSubtle;
     /** The dock position dots under the cinematic shelf's name (config.xml, cinematic_dots); false leaves them out. */
     final boolean cinematicDots;
     /** The cinematic shelf keeps the white focus highlight instead of the app's colour (config.xml, cinematic_white_focus). */
@@ -217,7 +221,7 @@ final class Config {
                    Festival festival, int[] inputKeycodes, List<String> appKeys, String stockHomeRedirect,
                    List<RaceWeekend.Race> raceCalendar, boolean cinematicHome, boolean ambientGlow, boolean appGlow, boolean fadeRows, int homeIdleClockMinutes,
                    boolean keyFilter, boolean dockGlass, String glowStyle, boolean wallpaperCaptions,
-                   boolean handleViewInputs, boolean tileMenu, boolean dockEvenPadding, boolean cinematicDots, boolean cinematicWhiteFocus, boolean wifiStatusColor, int cinematicScrim, int cinematicArt,
+                   boolean handleViewInputs, boolean tileMenu, boolean dockEvenPadding, boolean dockBand, boolean focusSubtle, boolean cinematicDots, boolean cinematicWhiteFocus, boolean wifiStatusColor, int cinematicScrim, int cinematicArt,
                    Map<String, Set<String>> wallpaperMoods) {
         this.handleViewInputs = handleViewInputs;
         this.tileMenu = tileMenu;
@@ -291,6 +295,8 @@ final class Config {
         this.homeIdleClockMinutes = homeIdleClockMinutes;
         this.dockGlass = dockGlass;
         this.dockEvenPadding = dockEvenPadding;
+        this.dockBand = dockBand;
+        this.focusSubtle = focusSubtle;
         this.cinematicDots = cinematicDots;
         this.cinematicWhiteFocus = cinematicWhiteFocus;
         this.wifiStatusColor = wifiStatusColor;
@@ -376,6 +382,8 @@ final class Config {
         boolean keyFilter = res.getBoolean(R.bool.key_filter);
         boolean dockGlass = res.getBoolean(R.bool.dock_glass);
         boolean dockEvenPadding = res.getBoolean(R.bool.dock_even_padding);
+        boolean dockBand = res.getBoolean(R.bool.dock_band);
+        boolean focusSubtle = res.getBoolean(R.bool.focus_subtle);
         boolean cinematicDots = res.getBoolean(R.bool.cinematic_dots);
         boolean cinematicWhiteFocus = res.getBoolean(R.bool.cinematic_white_focus);
         boolean wifiStatusColor = res.getBoolean(R.bool.wifi_status_color);
@@ -454,6 +462,8 @@ final class Config {
             keyFilter = bool(json, "key_filter", keyFilter);
             dockGlass = bool(json, "dock_glass", dockGlass);
             dockEvenPadding = bool(json, "dock_even_padding", dockEvenPadding);
+            dockBand = bool(json, "dock_band", dockBand);
+            focusSubtle = bool(json, "focus_subtle", focusSubtle);
             cinematicDots = bool(json, "cinematic_dots", cinematicDots);
             cinematicWhiteFocus = bool(json, "cinematic_white_focus", cinematicWhiteFocus);
             wifiStatusColor = bool(json, "wifi_status_color", wifiStatusColor);
@@ -515,7 +525,7 @@ final class Config {
                 Math.max(0, Math.min(100, skyIntensity)), settingsKeycodes, settingsKeyPanel, restoreKeyServices, wallpaperEnabled, wallpaper,
                 wallpapers, rotationMinutes, wallpaperDim, dockOpacity, wallpaperOrder, applied,
                 festival, inputKeycodes, appKeys, stockHomeRedirect, json == null ? Collections.emptyList() : raceCalendar(json), cinematic, ambientGlow, appGlow, fadeRows,
-                Math.max(0, idleClockMinutes), keyFilter, dockGlass, glowStyle, wallpaperCaptions, handleViewInputs, tileMenu, dockEvenPadding, cinematicDots, cinematicWhiteFocus, wifiStatusColor, cinematicScrim, cinematicArt, wallpaperMoods);
+                Math.max(0, idleClockMinutes), keyFilter, dockGlass, glowStyle, wallpaperCaptions, handleViewInputs, tileMenu, dockEvenPadding, dockBand, focusSubtle, cinematicDots, cinematicWhiteFocus, wifiStatusColor, cinematicScrim, cinematicArt, wallpaperMoods);
     }
 
     /**
