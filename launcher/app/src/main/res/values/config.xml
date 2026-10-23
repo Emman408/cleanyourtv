@@ -194,6 +194,11 @@
     <!-- A direct Launcher settings action instead of TV Settings in the header (or top_menu).
          Off by default; a theme can set "launcher_settings_button": true. -->
     <bool name="launcher_settings_button">false</bool>
+    <!-- One horizontal row of every app instead of the grid, parked at the bottom of the screen: COLUMNS tiles
+         visible, the rest scroll in with Right and run off the screen edge, the focused app's name sits above the
+         row, and only the top and bottom edges of the wallpaper are shaded. Off by default; a theme can set
+         "dock_scroll": true. -->
+    <bool name="dock_scroll">false</bool>
     <!-- The dock band as light frosted glass, like the Inputs, Wi-Fi and Settings pills, so a sky or wallpaper shows
          through it. false (the default) keeps the solid near-black band, or the cinematic shelf's dark glass. Can
          also be set with "dock_glass": true in a theme's config.json. -->

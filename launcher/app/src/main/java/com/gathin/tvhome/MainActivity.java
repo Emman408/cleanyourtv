@@ -133,6 +133,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private RecyclerView grid;
     private FrameLayout root;
     private WallpaperPlayer wallpaperPlayer;
+    private boolean dockScroll;
     private GlassView glass;
     private View ambient;
     private TextView heroName;
@@ -446,8 +447,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         grid = findViewById(R.id.grid);
         rtlAppGrid = getResources().getBoolean(R.bool.rtl_app_grid);
+        dockScroll = cfg.dockScroll;
         // Mirror only the app grid; the header and other locales keep their own layouts.
-        grid.setLayoutManager(new GridLayoutManager(this, COLUMNS) {
+        grid.setLayoutManager(new GridLayoutManager(this, dockScroll ? 1 : COLUMNS,
+                dockScroll ? RecyclerView.HORIZONTAL : RecyclerView.VERTICAL, false) {
             @Override
             protected boolean isLayoutRTL() {
                 return rtlAppGrid;
@@ -466,6 +469,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             public boolean requestChildRectangleOnScreen(@NonNull RecyclerView parent, @NonNull View child,
                                                          @NonNull Rect rect, boolean immediate,
                                                          boolean focusedChildVisible) {
+                if (dockScroll) return super.requestChildRectangleOnScreen(parent, child, rect, immediate, focusedChildVisible);
                 if (dockRow && getPosition(child) < COLUMNS) return false;
                 int top = child.getTop() + rect.top;
                 int bottom = top + rect.height();
@@ -484,7 +488,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         });
         ((GridLayoutManager) grid.getLayoutManager()).setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
-            @Override public int getSpanSize(int position) { return adapter != null && adapter.isLibraryAt(position) ? COLUMNS : 1; }
+            @Override public int getSpanSize(int position) { return adapter != null && !dockScroll && adapter.isLibraryAt(position) ? COLUMNS : 1; }
         });
         grid.setHasFixedSize(true);
         grid.setItemAnimator(null);
@@ -500,9 +504,39 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             public void onChildViewDetachedFromWindow(@NonNull View v) {
             }
         });
-        if (dockRow) grid.addItemDecoration(new DockDecoration(COLUMNS, density, cinematic, cfg.alwaysShowNames, cfg.dockOpacity, cfg.dockGlass, cfg.dockEvenPadding));
+        if (dockRow && !dockScroll) grid.addItemDecoration(new DockDecoration(COLUMNS, density, cinematic, cfg.alwaysShowNames, cfg.dockOpacity, cfg.dockGlass, cfg.dockEvenPadding));
+        if (dockScroll) {
+            // No band behind the row: shade only the top and bottom edges so the clock and the name stay readable
+            // and the middle of the picture stays bright.
+            if (!cinematic) {
+                View scrim = findViewById(R.id.heroScrim);
+                scrim.setBackgroundResource(R.drawable.bg_home_edges);
+                scrim.setVisibility(View.VISIBLE);
+            }
+            // The row runs to the screen edges: the screen's side margins move from the wrapper into the grid's
+            // padding, so the first tile stays where it was and the rest scroll off the real edge.
+            View wrapper = (View) grid.getParent();
+            ViewGroup screen = (ViewGroup) wrapper.getParent();
+            int start = screen.getPaddingStart(), end = screen.getPaddingEnd();
+            ViewGroup.MarginLayoutParams wlp = (ViewGroup.MarginLayoutParams) wrapper.getLayoutParams();
+            wlp.setMarginStart(-start);
+            wlp.setMarginEnd(-end);
+            wrapper.setLayoutParams(wlp);
+            grid.setPaddingRelative(grid.getPaddingStart() + start, grid.getPaddingTop(), grid.getPaddingEnd() + end, grid.getPaddingBottom());
+            // Nothing behind the header but the picture: a soft shadow keeps it readable on light wallpapers. Not on
+            // the name: its fades draw it through a layer the size of the text, which clips the shadow into a box,
+            // and the bottom shade already sits behind it. The name is a touch smaller and heavier, a title for
+            // the row rather than a headline.
+            for (int id : new int[]{R.id.greeting, R.id.clock, R.id.ampm, R.id.date}) {
+                ((TextView) findViewById(id)).setShadowLayer(8 * density, 0, density, 0x66000000);
+            }
+            if (!cinematic) {
+                heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 42f);
+                heroName.setTypeface(getResources().getFont(R.font.outfit_regular));
+            }
+        }
         // Reduced motion: the tiles are simply there, with no entrance (reloadApps skips it there too).
-        if (animations && !reducedMotion) {
+        if (animations && !reducedMotion && !dockScroll) {
             grid.setLayoutAnimation(new LayoutAnimationController(
                     AnimationUtils.loadAnimation(this, R.anim.tile_enter), 0.06f));
         }
@@ -515,7 +549,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
         // rows_below_dock grid rows under it; the rest of the grid stays below until you press Down.
-        int rowsBelowDock = cfg.rowsBelowDock;
+        int rowsBelowDock = dockScroll ? 0 : cfg.rowsBelowDock;   // one row: no grid rows under it
         grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
             int h = b - t;
             // Item height follows the tile size, which follows the columns and the rows that must fit (AppAdapter.tileWidthPx).
@@ -528,12 +562,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // even when the theme requests an extra visible row below the dock.
             int shelfClearance = cfg.appLibrary ? hero.getMeasuredHeight() + (int) (40 * density) : 0;
             int want = Math.max(shelfClearance, h - dockRow - gridRows - (int) (AppAdapter.BOTTOM_ROOM_DP * density));
+            // One horizontal row: a horizontal GridLayoutManager ignores the grid's top padding, so the whole grid
+            // moves down by a top margin instead, which puts the row at the bottom (measured from the item's height).
+            if (dockScroll) {
+                int cardH = AppAdapter.tileHeightPx(tileW);   // the tile itself: no name area in this mode
+                want = Math.max(0, h - cardH - (int) (AppAdapter.BOTTOM_ROOM_DP * density));
+                grid.setTranslationY(Math.max(0, want - grid.getPaddingTop()));
+            }
             // Where the rows cannot fit even at the smallest tile (3 rows with the title on), the title keeps its
             // room above the dock and the last rows run off the bottom instead of the title drawing over the clock.
             if (MainActivity.this.dockRow && cfg.dockTitle && rowsBelowDock > 0) want = Math.max(want, (int) (AppAdapter.TITLE_ROOM_DP * density));
             // No dock to push down: the grid starts at the top, with room for the first row's zoom and glass.
             if (!MainActivity.this.dockRow) want = (int) (AppAdapter.TOP_ROOM_DP * density);
-            if (grid.getPaddingTop() != want) {
+            if (!dockScroll && grid.getPaddingTop() != want) {
                 grid.setPadding(grid.getPaddingLeft(), want, grid.getPaddingRight(), grid.getPaddingBottom());
             }
             // Cold start or column count > 4: the first focus can run before the grid has its final width or
@@ -545,6 +586,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
+                if (dockScroll) {   // the one row scrolls sideways: place the glass on its tile after each move
+                    if (glassShown) grid.post(MainActivity.this::refitGlass);
+                    return;
+                }
                 if (!glassShown) return;
                 glassTargetY -= dy;
                 glassScrollShift -= dy;
@@ -1460,10 +1505,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             });
             return;
         }
+        // The one-row dock scrolls sideways: reveal the tile first, so its glass is placed where it lands.
+        if (dockScroll) {
+            revealRect.set(0, -(int) (6 * density) * 2, card.getWidth(), card.getHeight() + (int) (6 * density));
+            grid.requestChildRectangleOnScreen((View) card.getParent(), revealRect, true);
+        }
         // Tile rect in root coordinates, using layout positions (ignores the scale animation).
         Rect r = tileRect;
         r.set(0, 0, card.getWidth(), card.getHeight());
         root.offsetDescendantRectToMyCoords(card, r);
+        r.offset(0, (int) grid.getTranslationY());   // the one-row dock is moved down by translation (dock_scroll)
         float pad = 6f * density;        // matches GlassView's glow inset
         float scale = adapter.focusScale();
         float w = card.getWidth() * scale + 2 * pad;
@@ -1507,7 +1558,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             springY.animateToFinalPosition(y - glassScrollShift);
         }
         View item = (View) card.getParent();
-        if (dockRow && position < COLUMNS) {
+        if (dockRow && !dockScroll && position < COLUMNS) {
             // Dock: park it at the bottom of the screen and show the top shelf for this app.
             int decoratedTop = item.getTop() - (int) (6 * density);
             int dy = decoratedTop - grid.getPaddingTop();
@@ -1522,7 +1573,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } else {
             // Below the dock (or in a plain grid) the glow follows the tile without the big name; letting it
             // fade out left the grid on plain black.
-            showGlowOnly(position);
+            if (dockScroll) showHero(position, r.top);   // the one row keeps its title above it
+            else showGlowOnly(position);
             // Scroll just enough so the whole glass (not only the tile) is visible.
             revealRect.set(0, -(int) pad * 2, item.getWidth(), item.getHeight() + (int) pad);
             grid.requestChildRectangleOnScreen(item, revealRect, reducedMotion);
@@ -1540,7 +1592,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         float scale = adapter.focusScale();
         int w = (int) (card.getWidth() * scale + 2 * pad);
         int h = (int) (card.getHeight() * scale + 2 * pad);
-        if (!glassShown || card.getWidth() != glassCardW || glass.getWidth() != w || glass.getHeight() != h) {
+        // The one row moves sideways with every layout, so its glass is placed again each time, not only on resize.
+        if (dockScroll || !glassShown || card.getWidth() != glassCardW || glass.getWidth() != w || glass.getHeight() != h) {
             onTileFocused(pos, card);
         }
     }
@@ -1550,7 +1603,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void showHero(int position, float dockTopInRoot) {
         String label = adapter.labelAt(position);
         int color = adapter.ambientColorAt(position);
-        float y = dockTopInRoot - 14 * density - 26 * density - hero.getHeight();
+        // One row: the name sits just above it, as its title.
+        float y = dockTopInRoot - (dockScroll ? 18 : 14 + 26) * density - hero.getHeight();
         boolean changed = !label.contentEquals(heroName.getText());
         if (cinematic) showHeroArt(position);
 
@@ -2065,14 +2119,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return true;
             }
             // In the dock, the last app is the row's end: the empty slots after it take no focus.
-            int rowCount = position < COLUMNS ? Math.min(count, adapter.dockFilled()) : count;
-            return GridNavigation.atHorizontalEdge(position, rowCount, COLUMNS,
+            int rowCount = dockScroll ? count : position < COLUMNS ? Math.min(count, adapter.dockFilled()) : count;
+            return GridNavigation.atHorizontalEdge(position, rowCount, dockScroll ? count : COLUMNS,
                     rtlAppGrid, keyCode == KeyEvent.KEYCODE_DPAD_LEFT);
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-            if (position < COLUMNS) return false;          // dock row: let focus move to the top bar
+            if (dockScroll || position < COLUMNS) return false;   // dock row: let focus move to the top bar
             target = position - COLUMNS;
         } else {
+            if (dockScroll) return true;   // one row: nothing below it
             int lastRowStart = ((count - 1) / COLUMNS) * COLUMNS;
             if (position >= lastRowStart) {
                 if (adapter.isLibraryAt(count)) focusLibrary();
