@@ -50,6 +50,7 @@ final class WallpaperPlayer {
     private boolean active;
     private boolean closed;
     private boolean loading;
+    private OnlineWallpaperDownloader onlineDownloader;
     private String displayed = "";
     /** wallpaper_captions: the shown picture's name from wallpapers/captions.txt; null when off or there are none. */
     private final TextView caption;
@@ -129,10 +130,21 @@ final class WallpaperPlayer {
     void start() {
         active = true;
         update();
+        if (onlineDownloader == null && !files.isEmpty()) {
+            onlineDownloader = new OnlineWallpaperDownloader(
+                    files.get(0).getParentFile(),
+                    downloaded -> root.post(() -> {
+                        if (closed || !downloaded.isFile()) return;
+                        if (!files.contains(downloaded)) files.add(downloaded);
+                        update();
+                    }));
+        }
+        if (onlineDownloader != null) onlineDownloader.start();
     }
 
     void stop() {
         active = false;
+        if (onlineDownloader != null) onlineDownloader.stop();
     }
 
     /** The pictures the rotation picks from now: wallpaper_moods' group for the time of day, or the whole collection. */
@@ -149,6 +161,7 @@ final class WallpaperPlayer {
     void close() {
         active = false;
         closed = true;
+        if (onlineDownloader != null) onlineDownloader.close();
         decoder.shutdownNow();
     }
 
