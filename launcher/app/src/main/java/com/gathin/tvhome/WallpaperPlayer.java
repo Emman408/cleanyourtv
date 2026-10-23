@@ -12,6 +12,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -31,8 +32,16 @@ import java.util.concurrent.Executors;
 
 /** Displays and rotates a theme's local wallpaper images while Home is visible. */
 final class WallpaperPlayer {
+    /** Two 1080p pictures overlap only for this fade; the extra bitmap is released afterwards. */
+    private static final int FADE_MS = 1000;
+
     private final FrameLayout root;
     private final ImageView image;
+    /** On top of {@link #image} while a change fades in; gone the rest of the time. */
+    private ImageView incoming;
+    /** The picture still on {@link #image} during a fade, recycled when the new one is fully up. */
+    private Bitmap outgoing;
+    private final boolean fadeChanges;
     private final List<File> files;
     private final long interval;
     private final String order;
@@ -69,6 +78,7 @@ final class WallpaperPlayer {
         // The dim is painted into the picture (decode), so no full-screen shade layer is drawn on every frame.
         dimColor = config.wallpaperDim > 0 ? (config.wallpaperDim * 255 / 100) << 24 : 0;
         order = config.wallpaperOrder;
+        fadeChanges = config.wallpaperCrossfade && !config.reducedMotion;
         preferences = context.getSharedPreferences("wallpaper_rotation", Context.MODE_PRIVATE);
         moods = config.wallpaperMoods;
         latitude = moods.isEmpty() ? "" : context.getString(R.string.latitude);
@@ -109,7 +119,7 @@ final class WallpaperPlayer {
         while (first != null) {
             Bitmap bitmap = decode(first);
             if (bitmap != null) {
-                show(bitmap);
+                show(bitmap, false);
                 // The picture covers the whole screen: the root's plain colour under it is overdraw.
                 root.setBackground(null);
                 displayed = first.getName();
@@ -149,6 +159,7 @@ final class WallpaperPlayer {
     void close() {
         active = false;
         closed = true;
+        finishIncoming(false);
         decoder.shutdownNow();
     }
 
@@ -179,7 +190,7 @@ final class WallpaperPlayer {
                     update();
                     return;
                 }
-                show(bitmap);
+                show(bitmap, fadeChanges);
                 displayed = next.getName();
                 showCaption(true);
                 if (!displayed.equals(previous) || changed == 0) {
@@ -246,12 +257,52 @@ final class WallpaperPlayer {
         return key.toString();
     }
 
-    /** Puts a picture on screen and releases the previous one after a frame has drawn the new one. */
-    private void show(Bitmap bitmap) {
-        Bitmap old = current;
+    /**
+     * Puts a picture on screen. With wallpaper_crossfade, a later rotation fades the new 1080p bitmap
+     * over the current one for about a second, then drops the outgoing picture. Home's first frame
+     * stays instant. The previous bitmap is released after a frame has drawn the new one.
+     */
+    private void show(Bitmap bitmap, boolean fade) {
+        if (incoming != null) finishIncoming(true);
+        if (!fade || current == null) {
+            Bitmap old = current;
+            current = bitmap;
+            image.setImageBitmap(bitmap);
+            if (old != null && old != bitmap) image.postDelayed(old::recycle, 500);
+            return;
+        }
+        outgoing = current;
         current = bitmap;
-        image.setImageBitmap(bitmap);
-        if (old != null && old != bitmap) image.postDelayed(old::recycle, 500);
+        incoming = new ImageView(image.getContext());
+        incoming.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        incoming.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        incoming.setAlpha(0f);
+        incoming.setImageBitmap(bitmap);
+        int index = root.indexOfChild(image);
+        root.addView(incoming, index < 0 ? 0 : index + 1, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        incoming.animate()
+                .alpha(1f)
+                .setDuration(FADE_MS)
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .withEndAction(() -> finishIncoming(true))
+                .start();
+    }
+
+    /** Commits the incoming picture onto {@link #image} and frees the layer plus the old bitmap. */
+    private void finishIncoming(boolean keepNew) {
+        if (incoming != null) {
+            incoming.animate().cancel();
+            if (keepNew && current != null) image.setImageBitmap(current);
+            incoming.setImageBitmap(null);
+            if (incoming.getParent() == root) root.removeView(incoming);
+            incoming = null;
+        }
+        if (outgoing != null && outgoing != current) {
+            Bitmap old = outgoing;
+            outgoing = null;
+            image.postDelayed(old::recycle, 500);
+        }
     }
 
     private Bitmap decode(File file) {

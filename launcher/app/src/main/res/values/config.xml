@@ -236,6 +236,10 @@
          pictures in wallpapers/ ("01-dusk.jpg<TAB>Dusk over the peaks", one per line). A picture without a line
          shows no name. Can also be set with "wallpaper_captions": true in a theme's config.json. -->
     <bool name="wallpaper_captions">false</bool>
+    <!-- Rotating wallpapers: fade the next 1080p picture over the current one for about a second,
+         then drop the old bitmap. Off by default: the rotation still swaps in one frame, as before.
+         Can also be set with "wallpaper_crossfade": true in a theme's config.json. -->
+    <bool name="wallpaper_crossfade">false</bool>
     <!-- Rotating wallpapers grouped by the time of day, as JSON: {"morning": [file names], "evening": [...],
          "night": [...]}. While set, the rotation picks only from the group that fits now: morning from sunrise to
          noon, evening until half an hour after sunset, night the rest, with the sun at latitude and longitude (07:00
