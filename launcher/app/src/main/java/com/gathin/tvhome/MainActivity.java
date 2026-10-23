@@ -179,6 +179,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** The pills have been filled in once; later resumes refresh them after the first frame. */
     private boolean pillsShown;
     private TextView shamsiDate;
+    private TextView lunarDate;
+    private TextView ganzhiDate;
     private TextView stats;
     private List<RaceWeekend.Race> raceCalendar;
     private View racePanel;
@@ -186,6 +188,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** config.xml show_stats, overridable by a theme. Off: the line is gone and nothing is read. */
     private boolean showStats;
     private boolean shamsi;
+    /** config.xml, lunar_date, and a Chinese UI language: the lunar and solar-term line after the date (Lunar). */
+    private boolean lunar;
+    /** config.xml, ganzhi_date, and a Chinese UI language: the sexagenary line above the date (Lunar). */
+    private boolean ganzhi;
     /** greeting_name: said after the greeting, which is shown in capitals. */
     private String greetingName = "";
     /** Optional time-of-day backdrop (config.xml, sky_intensity); 0 keeps it hidden. */
@@ -372,7 +378,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         festival = cfg.festival;
         festive = festival.active(LocalDate.now());
         liveTvPkg = cfg.liveTvPackage;
-        idleClockMs = cfg.homeIdleClockMinutes * MINUTE_MS;
+        idleClockMs = (long) (cfg.homeIdleClockMinutes * MINUTE_MS);
         bootToLiveTv = cfg.bootToLiveTv;
         liveTvAction = cfg.liveTvAction;
         liveTvInputId = cfg.liveTvInputId;
@@ -436,6 +442,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         btnWifi = findViewById(R.id.btnWifi);
         shamsiDate = findViewById(R.id.shamsiDate);
+        lunarDate = findViewById(R.id.lunarDate);
+        ganzhiDate = findViewById(R.id.ganzhiDate);
         stats = findViewById(R.id.stats);
         raceCalendar = cfg.raceCalendar;
         racePanel = findViewById(R.id.racePanel);
@@ -444,12 +452,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         raceSessions = findViewById(R.id.raceSessions);
         showStats = cfg.showStats;
         shamsi = cfg.shamsiDate;
+        // The lunar line reads as Chinese text; other UI languages keep the date alone.
+        lunar = cfg.lunarDate && "zh".equals(Locale.getDefault().getLanguage());
+        ganzhi = cfg.ganzhiDate && "zh".equals(Locale.getDefault().getLanguage());
         greetingName = cfg.greetingName;
         if (shamsi) {
             shamsiDate.setVisibility(View.VISIBLE);
             TextView date = findViewById(R.id.date);
             date.setTextSize(11f);
             date.setPadding(0, (int) (4 * density), 0, 0);
+        }
+        if (lunar) {
+            lunarDate.setVisibility(View.VISIBLE);
+        }
+        if (ganzhi) {
+            ganzhiDate.setVisibility(View.VISIBLE);
         }
         vpnApp = cfg.vpnApp;
         moduleCards = cfg.moduleCards;
@@ -2284,6 +2301,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             greeting.setTextColor(greetingColor);
         }
         if (shamsi) shamsiDate.setText(Shamsi.today(getResources()));
+        if (lunar) {
+            LocalDate now = LocalDate.now();
+            String line = Lunar.label(now.getYear(), now.getMonthValue(), now.getDayOfMonth());
+            String term = Lunar.solarTerm(now.getYear(), now.getMonthValue(), now.getDayOfMonth());
+            if (line != null && term != null) {
+                // Only the leading solar term is tinted with its season color; the lunar month/day stay default.
+                SpannableString sp = new SpannableString(line);
+                sp.setSpan(new ForegroundColorSpan(Lunar.termColor(term)),
+                        0, term.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                lunarDate.setText(sp);
+            } else {
+                lunarDate.setText(line);
+            }
+        }
+        if (ganzhi) {
+            LocalDate now = LocalDate.now();
+            ganzhiDate.setText(Lunar.ganzhiLine(now.getYear(), now.getMonthValue(), now.getDayOfMonth()));
+        }
     }
 
     // ---- race-weekend panel (a theme's race_calendar) -----------------------------------------------

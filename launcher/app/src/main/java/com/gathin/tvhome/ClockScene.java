@@ -4,8 +4,14 @@ import android.animation.ArgbEvaluator;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.View;
+import android.widget.TextView;
 
+import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Random;
 
 /**
@@ -28,10 +34,16 @@ final class ClockScene {
     private final GradientDrawable glow;
     private int colorIndex;
     private int glowColor;
+    /** The lunar/ganzhi lines, mirroring Home: same config keys, shown only when the UI language is Chinese. */
+    private final TextView lunarView;
+    private final TextView ganzhiView;
+    private final boolean showLunar;
+    private final boolean showGanzhi;
 
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
+            updateDateTexts();   // the day (and its term/ganzhi) can roll over while the clock idles
             moveClock();
             shiftGlow();
             handler.postDelayed(this, MOVE_MS);
@@ -42,6 +54,14 @@ final class ClockScene {
     ClockScene(View root) {
         content = root.findViewById(R.id.dreamContent);
         View ambient = root.findViewById(R.id.dreamAmbient);
+        lunarView = root.findViewById(R.id.dreamLunar);
+        ganzhiView = root.findViewById(R.id.dreamGanzhi);
+        Config cfg = Config.load(root.getContext());
+        boolean zh = "zh".equals(Locale.getDefault().getLanguage());
+        showLunar = cfg.lunarDate && zh && lunarView != null;
+        showGanzhi = cfg.ganzhiDate && zh && ganzhiView != null;
+        if (showLunar) lunarView.setVisibility(View.VISIBLE);
+        if (showGanzhi) ganzhiView.setVisibility(View.VISIBLE);
         glow = new GradientDrawable();
         glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
         ambient.setBackground(glow);
@@ -53,6 +73,7 @@ final class ClockScene {
 
     void start() {
         content.setAlpha(0f);
+        updateDateTexts();
         content.post(() -> {
             placeClock();
             content.animate().alpha(1f).setDuration(1200).start();
@@ -103,5 +124,32 @@ final class ClockScene {
         glowColor = color;
         int c = color & 0x00FFFFFF;
         glow.setColors(new int[]{0x40000000 | c, 0x14000000 | c, 0x00000000 | c});
+    }
+
+    /** Fill the lunar and ganzhi lines for today, the same way Home does (Lunar), a no-op when either is off. */
+    private void updateDateTexts() {
+        if (!showLunar && !showGanzhi) {
+            return;
+        }
+        LocalDate now = LocalDate.now();
+        int year = now.getYear();
+        int month = now.getMonthValue();
+        int day = now.getDayOfMonth();
+        if (showLunar) {
+            String line = Lunar.label(year, month, day);
+            String term = Lunar.solarTerm(year, month, day);
+            if (line != null && term != null) {
+                // Only the leading solar term is tinted with its season color; the lunar month/day stay default.
+                SpannableString sp = new SpannableString(line);
+                sp.setSpan(new ForegroundColorSpan(Lunar.termColor(term)),
+                        0, term.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                lunarView.setText(sp);
+            } else {
+                lunarView.setText(line);
+            }
+        }
+        if (showGanzhi) {
+            ganzhiView.setText(Lunar.ganzhiLine(year, month, day));
+        }
     }
 }

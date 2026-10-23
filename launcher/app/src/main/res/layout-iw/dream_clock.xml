@@ -18,6 +18,21 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- Ganzhi line above the time (Chinese UI only, kept for view parity with layout/dream_clock.xml). -->
+        <TextView
+            android:id="@+id/dreamGanzhi"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="right"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="@string/font_regular"
+            android:letterSpacing="0.16"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -51,19 +66,43 @@
                 android:includeFontPadding="false" />
         </LinearLayout>
 
-        <TextClock
-            android:id="@+id/dreamDate"
+        <!-- Date row: the date/weekday, and the lunar line on the same row (Chinese UI only, kept for view
+             parity with layout/dream_clock.xml). -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:textDirection="rtl"
-            android:gravity="right"
-            android:format12Hour="@string/date_format"
-            android:format24Hour="@string/date_format"
-            android:textColor="#8CFFFFFF"
-            android:textSize="18sp"
-            android:fontFamily="@string/font_regular"
-            android:letterSpacing="0.14"
-            android:textAllCaps="true" />
+            android:orientation="horizontal"
+            android:layoutDirection="ltr"
+            android:baselineAligned="true">
+
+            <TextClock
+                android:id="@+id/dreamDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textDirection="rtl"
+                android:gravity="right"
+                android:format12Hour="@string/date_format"
+                android:format24Hour="@string/date_format"
+                android:textColor="#8CFFFFFF"
+                android:textSize="18sp"
+                android:fontFamily="@string/font_regular"
+                android:letterSpacing="0.14"
+                android:textAllCaps="true" />
+
+            <TextView
+                android:id="@+id/dreamLunar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:gravity="right"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="#A6FFFFFF"
+                android:textSize="18sp"
+                android:fontFamily="@string/font_regular"
+                android:letterSpacing="0.14"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>

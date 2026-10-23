@@ -178,6 +178,18 @@
          Gregorian date. -->
     <bool name="shamsi_date">false</bool>
 
+    <!-- Append the lunar date and the day's solar term after the date on Home and the clock screensaver,
+         e.g. "霜降 九月(大) 十四", in the Chinese style of dansion's lunarDate.js (table exact 1900-2101).
+         Off by default; shown only when this is on AND the UI language is Chinese, so any other language
+         keeps the date alone. Turn it on with "lunar_date": true in a theme's config.json. -->
+    <bool name="lunar_date">false</bool>
+
+    <!-- Show a ganzhi (sexagenary) line above the date on Home and the clock screensaver, e.g.
+         "丙午 (马) 年 - 戊戌月 - 庚午日", with the year and zodiac turning on 立春 and the month on each
+         solar term. Off by default; shown only when this is on AND the UI language is Chinese. Turn it on
+         with "ganzhi_date": true in a theme's config.json. -->
+    <bool name="ganzhi_date">false</bool>
+
     <!-- A name after the greeting: "Mr. Trịnh" shows GOOD MORNING, MR. TRỊNH. Empty: the greeting alone. -->
     <string name="greeting_name" translatable="false"></string>
     <!-- Optional VPN app the network pill opens (hold the pill for Wi-Fi settings), e.g. the package of the

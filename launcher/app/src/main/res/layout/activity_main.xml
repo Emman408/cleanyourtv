@@ -254,10 +254,33 @@
                             android:includeFontPadding="false"
                             android:visibility="gone" />
 
+                        <!-- Ganzhi (sexagenary) line above the date, filled by MainActivity when ganzhi_date
+                             is on and the UI language is Chinese, e.g. "丙午 (马) 年 - 戊戌月 - 庚午日". -->
+                        <TextView
+                            android:id="@+id/ganzhiDate"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="2dp"
+                            android:gravity="left"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textColor="#80FFFFFF"
+                            android:textSize="11sp"
+                            android:fontFamily="@string/font_regular"
+                            android:letterSpacing="0.16"
+                            android:visibility="gone" />
+
+                        <!-- Date and, when lunar_date is on and the UI language is Chinese, the lunar line
+                             ("霜降 九月(大) 十四") on the same row; the lunar part is filled by MainActivity. -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
                         <TextClock
                             android:id="@+id/date"
                             android:gravity="left"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:singleLine="@bool/date_single_line"
                             android:maxLines="2"
@@ -270,6 +293,22 @@
                             android:fontFamily="@string/font_regular"
                             android:letterSpacing="0.14"
                             android:textAllCaps="true" />
+
+                        <TextView
+                            android:id="@+id/lunarDate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:gravity="left"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textColor="#A6FFFFFF"
+                            android:textSize="14sp"
+                            android:fontFamily="@string/font_regular"
+                            android:letterSpacing="0.14"
+                            android:visibility="gone" />
+
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
 
