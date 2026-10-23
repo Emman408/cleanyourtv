@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.SystemClock;
 import android.os.UserManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -117,6 +118,20 @@ public class HomeKeyService extends AccessibilityService {
         }
         holdAppKeys = RemoteKeys.parseHoldAppKeys(config.appKeys);
         holdAppScancodes = RemoteKeys.parseHoldAppScancodes(config.appKeys);
+        // At cold boot the stock home can already be on screen before this service binds, so no window event for it
+        // ever arrives. Send Home once; with this launcher in front already it does nothing.
+        if (redirectAtBoot(!stockHome.isEmpty(), SystemClock.elapsedRealtime())) {
+            startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(getPackageName())
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+        }
+    }
+
+    /** Within this long after power-up a connecting service is a boot bind, not a restart while the family watches. */
+    static final long BOOT_WINDOW_MS = 3 * 60 * 1000L;
+
+    /** stock_home_redirect is set and the TV has only just started: the stock home may be up without an event. */
+    static boolean redirectAtBoot(boolean stockHomeSet, long uptimeMs) {
+        return stockHomeSet && uptimeMs < BOOT_WINDOW_MS;
     }
 
     private boolean isSettingsKey(KeyEvent event) {
